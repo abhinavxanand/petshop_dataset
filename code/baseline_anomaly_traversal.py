@@ -1,6 +1,4 @@
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
-
+import logging
 from typing import Dict, List, Any, Tuple, Union, Callable, Optional, Set
 
 import networkx as nx
@@ -8,8 +6,6 @@ import numpy as np
 import pandas as pd
 
 from dowhy.gcm import graph
-
-
 from rca_task import PotentialRootCause
 from data_preprocessing import (
     AnomalyDetectionConfig,
@@ -17,6 +13,8 @@ from data_preprocessing import (
     DEFAULT_ANOMALY_DETECTION,
 )
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def _anomaly_traversal(
     causal_graph: nx.DiGraph, anomaly_nodes: List[Any]
@@ -27,22 +25,28 @@ def _anomaly_traversal(
     :param anomaly_nodes: A list of the names of anomalous nodes.
     :return: A dictionary with the root causes as keys and NAN as score.
     """
+    logging.debug("Starting _anomaly_traversal")
+    logging.debug(f"Input causal_graph: {causal_graph}")
+    logging.debug(f"Input anomaly_nodes: {anomaly_nodes}")
+
     try:
         graph.validate_acyclic(causal_graph.subgraph(anomaly_nodes))
     except RuntimeError:
+        logging.error("The subgraph containing the anomalous nodes is cyclic!")
         raise ValueError(
             "The subgraph containing the anomalous nodes has to be acyclic for the traversal algorithm"
             "but the subgraph of anomalous nodes is cyclic!"
         )
+
     results = {}
 
     for anomaly_node in anomaly_nodes:
-        parents = causal_graph.predecessors(anomaly_node)
+        parents = list(causal_graph.predecessors(anomaly_node))
         if not set(anomaly_nodes) & set(parents):
             results[anomaly_node] = np.nan
 
+    logging.debug(f"Traversal results: {results}")
     return results
-
 
 def _score_potential_root_causes(
     causal_graph: nx.DiGraph,
@@ -60,6 +64,13 @@ def _score_potential_root_causes(
     :return: A list that contains all the paths from the root causes to the
              target node and the second entry is a dictionary.
     """
+    logging.debug("Starting _score_potential_root_causes")
+    logging.debug(f"Input causal_graph: {causal_graph}")
+    logging.debug(f"Input target_node: {target_node}")
+    logging.debug(f"Input metric: {metric}")
+    logging.debug(f"Input root_causes: {root_causes}")
+    logging.debug(f"Input all_anomalies: {all_anomalies}")
+
     results = {}
 
     for root_cause in root_causes:
@@ -77,11 +88,12 @@ def _score_potential_root_causes(
             if is_anomalous_path:
                 score = np.sum([all_anomalies[n] for n in nodes_on_path])
                 results[root_cause] = max(results.get(root_cause, -np.inf), score)
+    
+    logging.debug(f"Scoring results: {results}")
     return [
         PotentialRootCause(root_cause, metric, score)
         for (root_cause, score) in results.items()
     ]
-
 
 def _traversal_rca(
     causal_graph: nx.DiGraph,
@@ -107,6 +119,16 @@ def _traversal_rca(
     :return: A tuple containing two dictionaries, where the first one contains the root causes with scores and the
              second one all anomalous nodes with their scores.
     """
+    logging.debug("Starting _traversal_rca")
+    logging.debug(f"Input causal_graph: {causal_graph}")
+    logging.debug(f"Input target_node: {target_node}")
+    logging.debug(f"Input target_metric: {target_metric}")
+    logging.debug(f"Input normal_metrics: {normal_metrics}")
+    logging.debug(f"Input abnormal_metrics: {abnormal_metrics}")
+    logging.debug(f"Input anomaly_detection_config: {anomaly_detection_config}")
+    logging.debug(f"Input statistic_of_interest: {statistic_of_interest}")
+    logging.debug(f"Input search_for_anomaly: {search_for_anomaly}")
+
     all_anomalous_nodes_with_score = get_anomalous_metrics_and_scores(
         normal_metrics,
         abnormal_metrics,
@@ -117,10 +139,12 @@ def _traversal_rca(
         search_for_anomaly,
     )
     if all_anomalous_nodes_with_score == ({}, []):
+        logging.debug("No anomalies detected.")
         return all_anomalous_nodes_with_score
+
     root_causes = _anomaly_traversal(
         causal_graph,
-        list(
+        list( 
             {
                 c[0]
                 for c in abnormal_metrics.columns
@@ -133,8 +157,10 @@ def _traversal_rca(
     for rc in root_causes:
         root_causes[rc] = all_anomalous_nodes_with_score[rc]
 
-    return root_causes, all_anomalous_nodes_with_score
+    logging.debug(f"Root causes: {root_causes}")
+    logging.debug(f"All anomalous nodes with scores: {all_anomalous_nodes_with_score}")
 
+    return root_causes, all_anomalous_nodes_with_score
 
 def make_baseline_analyze_root_causes(
     anomaly_detection_config: AnomalyDetectionConfig = DEFAULT_ANOMALY_DETECTION,
@@ -158,6 +184,14 @@ def make_baseline_analyze_root_causes(
 
         Returns: List of potential root causes identifying nodes and assigning them scores.
         """
+        logging.debug("Starting baseline_analyze_root_causes")
+        logging.debug(f"Input graph: {graph}")
+        logging.debug(f"Input target_node: {target_node}")
+        logging.debug(f"Input target_metric: {target_metric}")
+        logging.debug(f"Input target_statistic: {target_statistic}")
+        logging.debug(f"Input normal_metrics: {normal_metrics}")
+        logging.debug(f"Input abnormal_metrics: {abnormal_metrics}")
+
         # We create a simple causal graph by reversing the edges.
         causal_graph = graph.reverse()
 
@@ -172,8 +206,10 @@ def make_baseline_analyze_root_causes(
             statistic_of_interest=target_statistic,
         )
         # Filter to root causes with anomalous paths to target and sum up scores along the way.
-        return _score_potential_root_causes(
+        result = _score_potential_root_causes(
             causal_graph, target_node, target_metric, root_causes, all_anomalous_nodes
         )
+        logging.debug(f"Root causes identified: {result}")
+        return result
 
     return baseline_analyze_root_causes

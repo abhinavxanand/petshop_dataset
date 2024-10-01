@@ -1,12 +1,9 @@
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Import necessary modules and functions
 
 import argparse
 import os
 import numpy as np
-
 import rca_task
-
 
 def run(dataset_path, method, method_name, out_dir):
     df = rca_task.evaluate(method, dataset_path)
@@ -25,7 +22,7 @@ def run(dataset_path, method, method_name, out_dir):
                 print(
                     f"for {scenario} with {issue_metric} with {size_all} ({empty:.2f} with no results) many issues at top{k} got {res:.3f}"
                 )
-    # Specificity
+    # Specificity 
     df_specificity = rca_task.evaluate_specificity(method, dataset_path)
     filename = f"results_specificity_{method_name}.csv"
     print(f"Storing results under {filename}")
@@ -38,10 +35,9 @@ def run(dataset_path, method, method_name, out_dir):
                 f"for {scenario} with {issue_metric} got specificity of {np.mean(df_sel.specificity):.3f}"
             )
 
-
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="A script to perform a anomaly-traversal to identify root-causes based on performance metrics from the PetShop application."
+        description="A script to perform anomaly-traversal to identify root-causes based on performance metrics from the PetShop application."
     )
     parser.add_argument(
         "--dataset_path", type=str, help="Path to petshop metric dataset."
@@ -50,10 +46,9 @@ def parse_args():
     parser.add_argument(
         "--method",
         type=str,
-        help="baseline, rcd, epsilon_diagnosis, circa and ranked_correlation currently implemented.",
+        help="baseline, rcd, epsilon_diagnosis, circa, ranked_correlation, random_walk, counterfactual_attribution, practice currently implemented.",
     )
     return parser.parse_args()
-
 
 def main():
     args = parse_args()
@@ -86,11 +81,18 @@ def main():
     elif args.method == "counterfactual_attribution":
         import counterfactual_attribution
         method = counterfactual_attribution.make_counterfactual_attribution_method()
+    
+    elif args.method == "hollow":
+        import hollow_rca
+        method = hollow_rca.make_hollow_rca()
+    
+    elif args.method == "kstest":
+        import kstest
+        method = kstest.make_kstest()
 
     else:
         raise ValueError(f"Unsupported method {args.method}")
     run(args.dataset_path, method, args.method, args.out_path)
-
 
 if __name__ == "__main__":
     main()

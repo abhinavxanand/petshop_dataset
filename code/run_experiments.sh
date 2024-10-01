@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python -W ignore run_experiments.py  --dataset_path '../dataset' --method 'circa' --out_path './results'
+python -W ignore run_experiments.py  --dataset_path '../dataset' --method 'kstest' --out_path './results'

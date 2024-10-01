@@ -1,0 +1,9 @@
+scenario,metric,ground_truth,specificity
+low_traffic,latency,,0.0
+low_traffic,availability,,0.0
+high_traffic,latency,,0.0
+high_traffic,availability,,0.0
+temporal_traffic1,latency,,0.0
+temporal_traffic1,availability,,0.0
+temporal_traffic2,latency,,0.0
+temporal_traffic2,availability,,0.0
